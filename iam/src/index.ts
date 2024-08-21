@@ -86,10 +86,16 @@ if (!process.env.IAM_JWK_EIP712) {
   configErrors.push("IAM_JWK_EIP712 is required");
 }
 
+if (!process.env.EAS_FEE_USD) {
+  configErrors.push("EAS_FEE_USD is required");
+}
+
 if (configErrors.length > 0) {
   configErrors.forEach((error) => console.error(error)); // eslint-disable-line no-console
   throw new Error("Missing required configuration");
 }
+
+const EAS_FEE_USD = parseFloat(process.env.EAS_FEE_USD);
 
 // Wallet to use for mainnets
 // Only functional in production (set to same as testnet for non-production environments)
@@ -341,7 +347,7 @@ type VerifyTypeResult = {
   code?: number;
 };
 
-async function verifyTypes(types: string[], payload: RequestPayload): Promise<VerifyTypeResult[]> {
+export async function verifyTypes(types: string[], payload: RequestPayload): Promise<VerifyTypeResult[]> {
   // define a context to be shared between providers in the verify request
   // this is intended as a temporary storage for providers to share data
   const context: ProviderContext = {};
@@ -352,9 +358,17 @@ async function verifyTypes(types: string[], payload: RequestPayload): Promise<Ve
     groupProviderTypesByPlatform(types).map(async (platformTypes) => {
       // Iterate over the types within a platform in series
       // This enables providers within a platform to reliably share context
-      for (const type of platformTypes) {
+      for (let type of platformTypes) {
         let verifyResult: VerifiedPayload = { valid: false };
         let code, error;
+
+        if (type.startsWith("AllowList")) {
+          payload.proofs = {
+            ...payload.proofs,
+            allowList: type.split("#")[1],
+          };
+          type = "AllowList";
+        }
 
         try {
           // verify the payload against the selected Identity Provider
@@ -364,8 +378,16 @@ async function verifyTypes(types: string[], payload: RequestPayload): Promise<Ve
             // TODO to be changed to just verifyResult.errors when all providers are updated
             const resultErrors = verifyResult.errors;
             error = resultErrors?.join(", ")?.substring(0, 1000) || "Unable to verify provider";
+            if (error.includes(`Request timeout while verifying ${type}.`)) {
+              console.log(`Request timeout while verifying ${type}`);
+              // If a request times out exit loop and return results so additional requests are not made
+              break;
+            }
           }
-        } catch {
+          if (type === "AllowList") {
+            type = `AllowList#${verifyResult.record.allowList}`;
+          }
+        } catch (e) {
           error = "Unable to verify provider";
           code = 400;
         }
@@ -495,7 +517,7 @@ app.post("/api/v0.0.0/eas", (req: Request, res: Response): void => {
           attestationChainIdHex
         );
 
-        const fee = await getEASFeeAmount(2);
+        const fee = await getEASFeeAmount(EAS_FEE_USD);
         const passportAttestation: PassportAttestation = {
           multiAttestationRequest,
           nonce: Number(nonce),
@@ -573,7 +595,7 @@ app.post("/api/v0.0.0/eas/passport", (req: Request, res: Response): void => {
           attestationChainIdHex
         );
 
-        const fee = await getEASFeeAmount(2);
+        const fee = await getEASFeeAmount(EAS_FEE_USD);
         const passportAttestation: PassportAttestation = {
           multiAttestationRequest,
           nonce: Number(nonce),
@@ -629,7 +651,7 @@ app.post("/api/v0.0.0/eas/score", async (req: Request, res: Response) => {
         attestationChainIdHex
       );
 
-      const fee = await getEASFeeAmount(2);
+      const fee = await getEASFeeAmount(EAS_FEE_USD);
       const passportAttestation: PassportAttestation = {
         multiAttestationRequest,
         nonce: Number(nonce),

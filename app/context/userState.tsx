@@ -15,3 +15,22 @@ export interface UserWarning {
 }
 
 export const userWarningAtom = atom<UserWarning | undefined>(undefined);
+
+export interface UserVerification {
+  loading: boolean;
+  success: boolean;
+  error?: string;
+}
+
+export const userVerificationAtom = atom<UserVerification>({
+  loading: false,
+  success: false,
+  error: undefined,
+});
+
+export const mutableUserVerificationAtom = atom(
+  (get) => get(userVerificationAtom),
+  (_get, set, newState: UserVerification) => {
+    set(userVerificationAtom, newState);
+  }
+);

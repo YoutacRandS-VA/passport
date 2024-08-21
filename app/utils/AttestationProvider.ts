@@ -5,7 +5,7 @@ import { iamUrl } from "../config/stamp_config";
 import { OnChainStatus } from "../utils/onChainStatus";
 import { ScoreStateType } from "../context/scorerContext";
 import { AllProvidersState, ProviderState } from "../context/ceramicContext";
-import { OnChainProviderType } from "../context/onChainContext";
+import { OnChainProviderType } from "../hooks/useOnChainData";
 import { Stamp } from "@gitcoin/passport-types";
 
 type ProviderWithStamp = ProviderState & { stamp: Stamp };
@@ -33,6 +33,7 @@ export interface AttestationProvider {
   name: string;
   status: AttestationProviderStatus;
   hasWebViewer: boolean;
+  attestationExplorerLinkText: string;
   viewerUrl: (address: string) => string;
   verifierAddress: () => string;
   verifierAbi: () => any;
@@ -42,7 +43,8 @@ export interface AttestationProvider {
     onChainProviders: OnChainProviderType[],
     rawScore: number,
     scoreState: ScoreStateType,
-    onChainScore: number
+    onChainScore: number,
+    expirationDate?: Date
   ) => OnChainStatus;
 }
 
@@ -50,6 +52,7 @@ class BaseAttestationProvider implements AttestationProvider {
   name = "Override this class";
   status: AttestationProviderStatus;
   hasWebViewer = false;
+  attestationExplorerLinkText = "Check attestation on EAS";
   chainId: string;
 
   constructor({ chainId, status }: { chainId: string; status: AttestationProviderStatus }) {
@@ -90,7 +93,8 @@ class BaseAttestationProvider implements AttestationProvider {
     onChainProviders: OnChainProviderType[],
     rawScore: number,
     scoreState: ScoreStateType,
-    onChainScore: number
+    onChainScore: number,
+    expirationDate?: Date
   ): OnChainStatus {
     // This is default implementation that will check for differences in
     // the on-chain providers and on-chain score
@@ -98,23 +102,20 @@ class BaseAttestationProvider implements AttestationProvider {
 
     if (onChainProviders.length === 0) return OnChainStatus.NOT_MOVED;
 
+    if (expirationDate && new Date() > expirationDate) return OnChainStatus.MOVED_EXPIRED;
+
     if (rawScore !== onChainScore) return OnChainStatus.MOVED_OUT_OF_DATE;
 
     const verifiedDbProviders: ProviderWithStamp[] = Object.values(allProvidersState).filter(
-      (provider): provider is ProviderWithStamp => provider.stamp !== undefined
+      (provider): provider is ProviderWithStamp => provider?.stamp !== undefined
     );
 
     const [equivalentProviders, differentProviders] = verifiedDbProviders.reduce(
       ([eq, diff], provider): [ProviderWithStamp[], ProviderWithStamp[]] => {
-        const expirationDateSeconds = Math.floor(new Date(provider.stamp.credential.expirationDate).valueOf() / 1000);
-        const issuanceDateSeconds = Math.floor(new Date(provider.stamp.credential.issuanceDate).valueOf() / 1000);
-
         const isEquivalent = onChainProviders.some(
           (onChainProvider) =>
             onChainProvider.providerName === provider.stamp.provider &&
-            onChainProvider.credentialHash === provider.stamp.credential.credentialSubject?.hash &&
-            Math.floor(onChainProvider.expirationDate.valueOf() / 1000) === expirationDateSeconds &&
-            Math.floor(onChainProvider.issuanceDate.valueOf() / 1000) === issuanceDateSeconds
+            onChainProvider.credentialHash === provider.stamp.credential.credentialSubject?.hash
         );
         return isEquivalent ? [[...eq, provider], diff] : [eq, [...diff, provider]];
       },
@@ -152,6 +153,7 @@ export class EASAttestationProvider extends BaseAttestationProvider {
 
 export class VeraxAndEASAttestationProvider extends EASAttestationProvider {
   name = "Verax, Ethereum Attestation Service (Score only)";
+  attestationExplorerLinkText = "Check attestation on Verax";
 
   async getMultiAttestationRequest(payload: {}): Promise<AxiosResponse<any, any>> {
     return axios.post(`${iamUrl}v0.0.0/eas/score`, payload, {
@@ -162,17 +164,25 @@ export class VeraxAndEASAttestationProvider extends EASAttestationProvider {
     });
   }
 
+  viewerUrl(address: string): string {
+    return this.easScanUrl;
+  }
+
   checkOnChainStatus(
     allProvidersState: AllProvidersState,
     onChainProviders: OnChainProviderType[],
     rawScore: number,
     scoreState: ScoreStateType,
-    onChainScore: number
+    onChainScore: number,
+    expirationDate?: Date
   ): OnChainStatus {
     // This is specific implementation for Verax where we only check for the score to be different
     if (scoreState !== "DONE" || onChainScore === undefined) {
       return OnChainStatus.LOADING;
     }
+
+    if (expirationDate && new Date() > expirationDate) return OnChainStatus.MOVED_EXPIRED;
+
     if (Number.isNaN(onChainScore)) return OnChainStatus.NOT_MOVED;
     return rawScore !== onChainScore ? OnChainStatus.MOVED_OUT_OF_DATE : OnChainStatus.MOVED_UP_TO_DATE;
   }

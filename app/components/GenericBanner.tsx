@@ -1,15 +1,18 @@
-import { PlatformBanner } from "@gitcoin/passport-platforms";
+import { PlatformBanner, Hyperlink } from "@gitcoin/passport-platforms";
 
 export function GenericBanner({ banner }: { banner: PlatformBanner }) {
+  const heading = banner.heading ? <>{banner.heading} </> : null;
   return (
-    <div className="mt-2 text-sm">
-      {banner.heading && <h2 className="mb-2 font-bold">{banner.heading}</h2>}
-      <h2 className="mb-2 ">{banner.content}</h2>
-      {banner.cta && (
-        <a href={banner.cta.url} className="mt-2 font-alt text-foreground-2" target="_blank" rel="noopener noreferrer">
-          {banner.cta.label} →
-        </a>
-      )}
+    <div className="mt-8 text-sm">
+      <div className="mb-2 font-normal inline-block">
+        {heading}
+        {banner.cta && (
+          <Hyperlink href={banner.cta.url} className="inline-block underline text-color-5 font-bold">
+            {banner.cta.label}
+          </Hyperlink>
+        )}
+      </div>
+      <div className="mb-2 inline-block">{banner.content}</div>
     </div>
   );
 }

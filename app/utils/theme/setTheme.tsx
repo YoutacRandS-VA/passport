@@ -7,6 +7,7 @@ const setTheme = ({ colors, fonts }: Theme) => {
   r.style.setProperty("--color-background-2", colors.background2);
   r.style.setProperty("--color-background-3", colors.background3);
   r.style.setProperty("--color-background-4", colors.background4);
+  r.style.setProperty("--color-background-5", colors.background5);
   r.style.setProperty("--color-foreground", colors.foreground);
   r.style.setProperty("--color-foreground-2", colors.foreground2);
   r.style.setProperty("--color-foreground-3", colors.foreground3);
@@ -19,6 +20,11 @@ const setTheme = ({ colors, fonts }: Theme) => {
   r.style.setProperty("--color-text-3", colors.text3);
   r.style.setProperty("--color-text-4", colors.text4);
   r.style.setProperty("--color-text-5", colors.text5);
+  r.style.setProperty("--color-text-6", colors.text6);
+  r.style.setProperty("--color-text-7", colors.text7);
+  r.style.setProperty("--color-text-8", colors.text8);
+  r.style.setProperty("--color-text-9", colors.text9);
+  r.style.setProperty("--color-text-10", colors.text10);
   r.style.setProperty("--color-focus", colors.focus);
 
   r.style.setProperty("--font-body", fonts.body);

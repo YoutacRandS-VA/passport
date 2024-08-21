@@ -23,6 +23,10 @@ export function difference(setA: Set<PROVIDER_ID>, setB: Set<PROVIDER_ID>) {
   return _difference;
 }
 
+export function intersect<T>(setA: Set<T>, setB: Set<T>): Set<T> {
+  return new Set([...setA].filter((item) => setB.has(item)));
+}
+
 export function generateUID(length: number) {
   return window
     .btoa(
@@ -45,8 +49,20 @@ export function reduceStampResponse(providerIDs: PROVIDER_ID[], verifiedCredenti
     }));
 }
 
-export function checkShowOnboard(): boolean {
+// This is pulled out to support testing
+// Use `checkShowOnboard` instead
+export function _checkShowOnboard(currentOnboardResetIndex: string) {
+  const savedOnboardResetIndex = localStorage.getItem("onboardResetIndex");
+
+  localStorage.setItem("onboardResetIndex", currentOnboardResetIndex || "");
+
+  if (currentOnboardResetIndex && currentOnboardResetIndex !== savedOnboardResetIndex) {
+    localStorage.removeItem("onboardTS");
+    return true;
+  }
+
   const onboardTs = localStorage.getItem("onboardTS");
+
   if (!onboardTs) return true;
   // Get the current Unix timestamp in seconds.
   const currentTimestamp = Math.floor(Date.now() / 1000);
@@ -64,6 +80,11 @@ export function checkShowOnboard(): boolean {
   }
 
   return onBoardOlderThanThreeMonths;
+}
+
+export function checkShowOnboard(): boolean {
+  const currentOnboardResetIndex = process.env.NEXT_PUBLIC_ONBOARD_RESET_INDEX || "";
+  return _checkShowOnboard(currentOnboardResetIndex);
 }
 
 /**

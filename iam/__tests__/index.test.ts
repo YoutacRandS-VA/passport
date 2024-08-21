@@ -2,9 +2,10 @@
 import request from "supertest";
 import * as DIDKit from "@spruceid/didkit-wasm-node";
 import { PassportCache, providers } from "@gitcoin/passport-platforms";
+import axios from "axios";
 
 // ---- Test subject
-import { app, getAttestationDomainSeparator } from "../src/index";
+import { app, getAttestationDomainSeparator, verifyTypes } from "../src/index";
 
 // ---- Types
 import {
@@ -190,7 +191,7 @@ describe("POST /challenge", function () {
 
 describe("POST /verify", function () {
   afterEach(() => {
-    jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   it("handles valid wallet-signed challenge requests", async () => {
@@ -520,24 +521,27 @@ describe("POST /verify", function () {
   });
 
   it("handles valid challenge requests with multiple types, and acumulates values between provider calls", async () => {
+    // Just pick the first 3 providers
+    const providerNamesKeys = Object.keys(providers._providers);
+    const provider_1 = providerNamesKeys[0];
+    const provider_2 = providerNamesKeys[1];
+    const provider_3 = providerNamesKeys[2];
+
     // challenge received from the challenge endpoint
     const challenge = {
       issuer: issuer,
       credentialSubject: {
         id: "did:pkh:eip155:1:0x0",
-        provider: "challenge-GitcoinContributorStatistics#numGrantsContributeToGte#10",
+        provider: `challenge-${provider_1}`,
         address: "0x0",
         challenge: "123456789ABDEFGHIJKLMNOPQRSTUVWXYZ",
       },
     };
+
     // payload containing a signature of the challenge in the challenge credential
     const payload = {
-      type: "GitcoinContributorStatistics#numGrantsContributeToGte#10",
-      types: [
-        "GitcoinContributorStatistics#numGrantsContributeToGte#10",
-        "GitcoinContributorStatistics#numGrantsContributeToGte#25",
-        "GitcoinContributorStatistics#numGrantsContributeToGte#100",
-      ],
+      type: provider_1,
+      types: [provider_1, provider_2, provider_3],
       address: "0x0",
       proofs: {
         code: "SECRET_CODE",
@@ -546,7 +550,7 @@ describe("POST /verify", function () {
 
     // spy on the providers
     jest
-      .spyOn(providers._providers["GitcoinContributorStatistics#numGrantsContributeToGte#10"], "verify")
+      .spyOn(providers._providers[provider_1], "verify")
       .mockImplementation(async (payload: RequestPayload, context: ProviderContext): Promise<VerifiedPayload> => {
         context["update_1"] = true;
         return {
@@ -557,10 +561,9 @@ describe("POST /verify", function () {
         };
       });
     jest
-      .spyOn(providers._providers["GitcoinContributorStatistics#numGrantsContributeToGte#25"], "verify")
+      .spyOn(providers._providers[provider_2], "verify")
       .mockImplementation(async (payload: RequestPayload, context: ProviderContext): Promise<VerifiedPayload> => {
         context["update_2"] = true;
-
         return {
           valid: true,
           record: {
@@ -569,7 +572,7 @@ describe("POST /verify", function () {
         };
       });
     const gitcoinGte100 = jest
-      .spyOn(providers._providers["GitcoinContributorStatistics#numGrantsContributeToGte#100"], "verify")
+      .spyOn(providers._providers[provider_3], "verify")
       .mockImplementation(async (payload: RequestPayload, context: ProviderContext): Promise<VerifiedPayload> => {
         return {
           valid: true,
@@ -594,15 +597,11 @@ describe("POST /verify", function () {
     expect((response.body[0] as ValidResponseBody).credential.credentialSubject.id).toEqual(expectedId);
     expect((response.body[1] as ValidResponseBody).credential.credentialSubject.id).toEqual(expectedId);
 
-    expect(gitcoinGte100).toBeCalledWith(
+    expect(gitcoinGte100).toHaveBeenCalledWith(
       {
         // issuer: issuer,
-        type: "GitcoinContributorStatistics#numGrantsContributeToGte#10",
-        types: [
-          "GitcoinContributorStatistics#numGrantsContributeToGte#10",
-          "GitcoinContributorStatistics#numGrantsContributeToGte#25",
-          "GitcoinContributorStatistics#numGrantsContributeToGte#100",
-        ],
+        type: provider_1,
+        types: [provider_1, provider_2, provider_3],
         address: "0x0",
         proofs: { code: "SECRET_CODE" },
       },
@@ -905,6 +904,37 @@ describe("POST /check", function () {
     expect(response.body[0].type).toEqual("Simple");
   });
 
+  it("handles valid check request with AllowListStamp", async () => {
+    const allowProvider = "AllowList#test";
+    jest
+      .spyOn(providers._providers.AllowList, "verify")
+      .mockImplementation(async (payload: RequestPayload, context: ProviderContext): Promise<VerifiedPayload> => {
+        return {
+          valid: true,
+          record: {
+            allowList: "test",
+          },
+        };
+      });
+    const payload = {
+      types: ["Simple", allowProvider],
+      address: "0x0",
+      proofs: {
+        valid: "true",
+      },
+    };
+
+    const response = await request(app)
+      .post("/api/v0.0.0/check")
+      .send({ payload })
+      .set("Accept", "application/json")
+      .expect(200)
+      .expect("Content-Type", /json/);
+
+    expect(response.body[1].valid).toBe(true);
+    expect(response.body[1].type).toEqual("AllowList#test");
+  });
+
   it("handles valid check requests with multiple types", async () => {
     const payload = {
       types: ["Simple", "AnotherType"],
@@ -1165,7 +1195,11 @@ describe("POST /eas", () => {
       .spyOn(easSchemaMock, "formatMultiAttestationRequest")
       .mockReturnValue(Promise.resolve(mockMultiAttestationRequestWithPassportAndScore));
     const nonce = 0;
-    const expectedFeeUsd = 2;
+    const expectedFeeUsd = parseFloat(process.env.EAS_FEE_USD);
+
+    expect(expectedFeeUsd).toBeDefined();
+    expect(typeof expectedFeeUsd).toBe("number");
+    expect(expectedFeeUsd).toBeGreaterThan(1);
 
     const credentials = [
       {
@@ -1371,8 +1405,8 @@ describe("POST /eas/passport", () => {
 
     expect(response.body.passport.multiAttestationRequest).toEqual(mockMultiAttestationRequestWithPassportAndScore);
     expect(response.body.passport.nonce).toEqual(nonce);
-    expect(identityMock.verifyCredential).toBeCalledTimes(credentials.length);
-    expect(formatMultiAttestationRequestSpy).toBeCalled();
+    expect(identityMock.verifyCredential).toHaveBeenCalledTimes(credentials.length);
+    expect(formatMultiAttestationRequestSpy).toHaveBeenCalled();
   });
 
   it("handles error during the formatting of the passport", async () => {
@@ -1435,3 +1469,5 @@ describe("POST /eas/passport", () => {
     expect(response.body.error).toEqual("Error formatting onchain passport, Error: Verification error");
   });
 });
+
+describe("verifyTypes", () => {});

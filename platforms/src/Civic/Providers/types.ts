@@ -26,13 +26,13 @@ export const supportedChains = [
   "XDC_APOTHEM",
 ] as const;
 
-export type SupportedChain = (typeof supportedChains)[number];
+export type SupportedChain = typeof supportedChains[number];
 
 type CivicPassState = "ACTIVE" | "FROZEN" | "REVOKED";
 
 export type CivicPassLookupPass = {
   type: {
-    slotId: number;
+    slotId: string; // hex string
     address: string;
     name?: string;
   };

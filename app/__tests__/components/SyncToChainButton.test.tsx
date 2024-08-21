@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor } from "@testing-library/react";
 import axios from "axios";
 import { getButtonMsg, SyncToChainButton } from "../../components/SyncToChainButton";
 import { OnChainStatus } from "../../utils/onChainStatus";
@@ -6,26 +6,12 @@ import { makeTestCeramicContext, renderWithContext } from "../../__test-fixtures
 import { CeramicContextState } from "../../context/ceramicContext";
 import { Chain } from "../../utils/chains";
 import { ChakraProvider } from "@chakra-ui/react";
-
-const mockSetChain = jest.fn();
-
-jest.mock("@web3-onboard/react", () => ({
-  init: () => ({
-    connectWallet: jest.fn(),
-    disconnectWallet: () => Promise.resolve(),
-    state: {
-      select: () => ({
-        subscribe: () => {},
-      }),
-    },
-  }),
-}));
+import { switchNetworkMock } from "../../__mocks__/web3modalMock";
 
 const mockWalletState = {
   address: "0x123",
   provider: jest.fn(),
   chain: "0x14a33",
-  setChain: mockSetChain,
 };
 
 jest.mock("../../context/walletStore", () => ({
@@ -79,6 +65,8 @@ const chainConfig = {
   label: "test",
   rpcUrl: "test",
   icon: "icon",
+  chainLink: "",
+  explorerUrl: "",
 };
 
 const chainWithoutEas = new Chain(chainConfig);
@@ -97,17 +85,26 @@ const mockCeramicContext: CeramicContextState = makeTestCeramicContext();
 
 describe("SyncToChainButton component", () => {
   it("should show coming soon if in active", async () => {
-    render(<SyncToChainButton onChainStatus={OnChainStatus.NOT_MOVED} chain={chainWithoutEas} />);
+    renderWithContext(
+      mockCeramicContext,
+      <SyncToChainButton onChainStatus={OnChainStatus.NOT_MOVED} chain={chainWithoutEas} />
+    );
 
     expect(screen.getByText("Coming Soon")).toBeInTheDocument();
   });
   it("should be disabled if not active", async () => {
-    render(<SyncToChainButton onChainStatus={OnChainStatus.NOT_MOVED} chain={chainWithoutEas} />);
+    renderWithContext(
+      mockCeramicContext,
+      <SyncToChainButton onChainStatus={OnChainStatus.NOT_MOVED} chain={chainWithoutEas} />
+    );
     const btn = screen.getByTestId("sync-to-chain-button");
     expect(btn).toHaveAttribute("disabled");
   });
   it("should be disabled if up to date", async () => {
-    render(<SyncToChainButton onChainStatus={OnChainStatus.MOVED_UP_TO_DATE} chain={chainWithEas} />);
+    renderWithContext(
+      mockCeramicContext,
+      <SyncToChainButton onChainStatus={OnChainStatus.MOVED_UP_TO_DATE} chain={chainWithEas} />
+    );
     const btn = screen.getByTestId("sync-to-chain-button");
     expect(btn).toHaveAttribute("disabled");
   });
@@ -129,7 +126,7 @@ describe("SyncToChainButton component", () => {
     const btn = screen.getByTestId("sync-to-chain-button");
     expect(btn).toHaveTextContent("Mint");
     fireEvent.click(btn);
-    await waitFor(() => expect(mockSetChain).toHaveBeenCalled());
+    await waitFor(() => expect(switchNetworkMock).toHaveBeenCalled());
   });
   it("should render error toast if no stamps", async () => {
     renderWithContext(

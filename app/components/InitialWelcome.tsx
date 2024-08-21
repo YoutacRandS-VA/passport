@@ -1,100 +1,107 @@
 import { useState } from "react";
 import { WelcomeWrapper } from "./WelcomeWrapper";
+import { useNavigateToPage } from "../hooks/useCustomization";
 
 export const InitialWelcome = ({
   onBoardFinished,
-  dashboardCustomizationKey,
+  hasPassports,
 }: {
   onBoardFinished: () => void;
-  dashboardCustomizationKey: string | null;
+  hasPassports: boolean;
 }) => {
   const [step, setStep] = useState(0);
 
-  const onSkip = () => {
-    setStep(0);
-  };
-
-  const welcomeSteps = [
+  const navigateToPage = useNavigateToPage();
+  const welcomeStepsNewUser = [
     {
-      header: "Welcome to Gitcoin Passport!",
-      subHeader: "Privacy-First Verification",
-      subHeaderIconSrc: "./assets/shieldLockIcon.svg",
-      body: 'Passport helps you collect "stamps" that prove your humanity and reputation. You decide what stamps are shown. And your privacy is protected at each step of the way.',
+      header: "Build Your Passport Score",
+      backgroudIconSrc: "./assets/passportBackgroundLogo.svg",
+      stampIcon: "./assets/gitcoin-flower.svg",
+      scoreIcon: "./assets/passport_score.svg",
+      body: "Your Passport Score verifies your Web3 and Web2 presence, opening up a realm of possibilities as you accumulate Stamps and build your score. A higher score equals greater trust, paving the way for you to engage with community programs and governance.",
       stepsConfig: {
         current: 1,
         total: 3,
       },
       buttonsConfig: {
-        onSkip,
+        skipButtonText: "Skip",
+        onSkip: () => {
+          navigateToPage("dashboard");
+        },
         onNext: () => setStep(1),
-        dashboardCustomizationKey,
       },
     },
     {
-      header: "Introducing Passport Scoring",
-      subHeader: "Your Unique Humanity Score",
-      subHeaderIconSrc: "./assets/hexagonIcon.svg",
-      body: "Your Unique Humanity Score represents your trustworthiness to web3 projects. Increase your score to unlock higher quality experiences.",
+      header: "Accumulate Verified Stamps",
+      body: "Stamps affirm your identity and are key to accessing Web3's offerings. They are akin to digital visas, each one from a different verifier, showcasing your active participation. To obtain a Stamp, follow the specific verifier's process. Each Stamp you collect has a 90-day validity, symbolizing your ongoing engagement and ensuring the Passport's integrity.",
+      backgroudIconSrc: "./assets/passportBackgroundLogo.svg",
+      stampIcon: "./assets/stamp-cards.svg",
+      displayPlatformCard: true,
       stepsConfig: {
         current: 2,
         total: 3,
       },
       buttonsConfig: {
-        onSkip,
+        skipButtonText: "Back",
+        onSkip: () => setStep(0),
         onNext: () => setStep(2),
-        dashboardCustomizationKey,
       },
     },
     {
-      header: "Get Started",
-      subHeader: "Verification Steps",
-      subHeaderIconSrc: "./assets/lockIcon.svg",
+      header: "Get verified with one simple step",
+      backgroudIconSrc: "./assets/passportBackgroundLogo.svg",
+      stampIcon: "./assets/passport-flash.svg",
       body: (
-        <ol className="list-none">
-          <ListItem number={1}>Verify your web3 stamps now with one-click verification.</ListItem>
-          <ListItem number={2}>Verify any remaining web2 stamps.</ListItem>
-          <ListItem number={3}>See your Unique Humanity Score increase.</ListItem>
-        </ol>
+        <p>
+          <span className="text-color-6 font-bold">Verify your identity with just one click.</span> Our system will
+          check your ETH account for activities that match our Stamp criteria. This quick verification is your first
+          step into a broader Web3 world, giving you immediate access to what you qualify for today. To keep up with our
+          90 day default expiry period for Stamps, you can re-verify whenever you need.
+        </p>
       ),
       stepsConfig: {
         current: 3,
         total: 3,
       },
       buttonsConfig: {
-        onSkip,
+        skipButtonText: "Back",
+        onSkip: () => setStep(1),
+        displaySkipBtn: true,
         onNext: () => onBoardFinished(),
-        dashboardCustomizationKey,
-        nextButtonText: "Verify stamps",
+        nextButtonText: "Verify",
+        showSkipNextTime: false,
       },
     },
   ];
+
+  const welcomeStepsReturningUser = [
+    {
+      header: "Auto refresh",
+      backgroudIconSrc: "./assets/passportBackgroundLogo.svg",
+      stampIcon: "./assets/passport-flash.svg",
+      body: (
+        <p>
+          <span className="text-color-6 font-bold">Verify your identity with just one click.</span> Our system will
+          check your ETH account for activities that match our Stamp criteria. This quick verification is your first
+          step into a broader Web3 world, giving you immediate access to what you qualify for today. To keep up with our
+          90 day default expiry period for Stamps, you can re-verify whenever you need.
+        </p>
+      ),
+      buttonsConfig: {
+        skipButtonText: "Back",
+        onSkip: () => setStep(1),
+        displaySkipBtn: false,
+        onNext: () => onBoardFinished(),
+        nextButtonText: "Get Started",
+        showSkipNextTime: true,
+      },
+    },
+  ];
+
+  const welcomeSteps = hasPassports ? welcomeStepsReturningUser : welcomeStepsNewUser;
 
   const content = welcomeSteps[step];
   const body = content.body;
 
   return <WelcomeWrapper content={content}>{body}</WelcomeWrapper>;
 };
-
-const ListItem = ({ children, number }: { children: React.ReactNode; number: number }) => (
-  <li className="flex items-start gap-2 py-1">
-    <ListMarker number={number} />
-    <div className="leading-6">{children}</div>
-  </li>
-);
-
-const ListMarker = ({ number }: { number: number }) => (
-  <div className="h-6 w-6">
-    <svg width="24" height="25" className="col-start-1 row-start-1">
-      <defs>
-        <linearGradient id="Gradient" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="rgb(var(--color-foreground))" />
-          <stop offset="100%" stopColor="rgb(var(--color-foreground-2))" />
-        </linearGradient>
-      </defs>
-      <circle r="11" cx="12" cy="12" stroke="url(#Gradient)" strokeWidth="1" />
-      <text x="50%" y="55%" textAnchor="middle" fill="white" dominantBaseline="middle">
-        {number}
-      </text>
-    </svg>
-  </div>
-);

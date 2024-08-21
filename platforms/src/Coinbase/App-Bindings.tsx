@@ -1,12 +1,8 @@
-import { PlatformOptions } from "../types";
-import { Platform } from "../utils/platform";
+import { AppContext, PlatformOptions, ProviderPayload } from "../types";
+import { Platform, PlatformPreCheckError } from "../utils/platform";
 import React from "react";
-
-const Link = ({ href, children }: { href: string; children: React.ReactNode }) => (
-  <a href={href} target="_blank" className="text-color-1 cursor-pointer underline" rel="noreferrer">
-    {children}
-  </a>
-);
+import { verifyCoinbaseAttestation } from "./Providers/coinbase";
+import { Hyperlink } from "../utils/Hyperlink";
 
 export class CoinbasePlatform extends Platform {
   platformId = "Coinbase";
@@ -15,13 +11,25 @@ export class CoinbasePlatform extends Platform {
   redirectUri: string = null;
 
   banner = {
-    content: `Integrate your Coinbase account with your onchain identity to unlock a realm of
-      digital possibilities. This stamp requires you to have an active Coinbase account
-      and to establish your onchain identity on Base, bridging the gap between
-      traditional and decentralized finance.`.replace(/\s+/gm, " "),
+    content: (
+      <div>
+        Obtain the Coinbase stamp by completing the following 2 steps to prove your Coinbase Verified ID and Coinbase
+        account: <br />
+        <br />
+        Step 1:{" "}
+        <Hyperlink className="pl-1" href="https://www.coinbase.com/onchain-verify">
+          Verify Coinbase ID
+        </Hyperlink>{" "}
+        on this wallet address <br />
+        <br />
+        Step 2: Click Verify below to sign into your Coinbase account <br />
+        You cannot complete without completing the Coinbase attestation onchain in Step 1. Ensure you have an active
+        Coinbase account with a verified government ID to mint your onchain attestation for free on base.
+      </div>
+    ),
     cta: {
-      label: "Begin Your Onchain Verification Journey with Coinbase",
-      url: "https://www.coinbase.com/onchain-verify",
+      label: "Support guide on adding Coinbase",
+      url: "https://support.passport.xyz/passport-knowledge-base/stamps/how-do-i-add-passport-stamps/guide-to-add-coinbase-stamp-to-passport",
     },
   };
 
@@ -29,6 +37,31 @@ export class CoinbasePlatform extends Platform {
     super();
     this.clientId = options.clientId as string;
     this.redirectUri = options.redirectUri as string;
+  }
+
+  async getProviderPayload(appContext: AppContext): Promise<ProviderPayload> {
+    const address = appContext.userDid.split(":")[4].toLowerCase();
+
+    let hasAttestation = false;
+
+    try {
+      hasAttestation = await verifyCoinbaseAttestation(address);
+    } catch (e) {
+      console.error("Unable to complete Coinbase attestation pre-check", e);
+
+      // There are occasional CORS issues which we can't identify the cause of
+      // currently, so if this request fails just ignore it and do the standard
+      // flow
+      hasAttestation = true;
+    }
+
+    if (!hasAttestation) {
+      throw new PlatformPreCheckError(
+        "You need to verify your Coinbase ID onchain before you can verify your Coinbase account."
+      );
+    }
+
+    return super.getProviderPayload(appContext);
   }
 
   async getOAuthUrl(state: string): Promise<string> {

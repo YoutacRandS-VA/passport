@@ -1,16 +1,18 @@
 import React from "react";
 import { Button, ButtonProps } from "./Button";
-import { Spinner } from "@chakra-ui/react";
+import { Spinner } from "./Spinner";
 
 export type LoadingButtonProps = ButtonProps & {
   isLoading?: boolean;
+  loadIconPosition?: "left" | "right";
 };
 
-export const LoadButton = ({ isLoading, disabled, children, ...props }: LoadingButtonProps) => {
+export const LoadButton = ({ isLoading, disabled, children, loadIconPosition, ...props }: LoadingButtonProps) => {
   return (
     <Button {...props} disabled={disabled || isLoading}>
+      {isLoading && loadIconPosition !== "right" && <Spinner />}
       {children}
-      {isLoading && <Spinner size="sm" />}
+      {isLoading && loadIconPosition === "right" && <Spinner />}
     </Button>
   );
 };

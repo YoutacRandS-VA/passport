@@ -29,18 +29,15 @@ jest.mock("@gitcoin/passport-identity", () => ({
   fetchVerifiableCredential: jest.fn(),
 }));
 
-jest.mock("../../utils/helpers.tsx", () => ({
-  createSignedPayload: jest.fn(),
-  generateUID: jest.fn(),
-  getProviderSpec: jest.fn(),
-  difference: (setA: any, setB: any) => {
-    const _difference = new Set(setA);
-    setB.forEach((elem: any) => {
-      _difference.delete(elem);
-    });
-    return _difference;
-  },
-}));
+jest.mock("../../utils/helpers.tsx", () => {
+  const originalModule = jest.requireActual("../../utils/helpers.tsx");
+  return {
+    ...originalModule,
+    createSignedPayload: jest.fn(),
+    generateUID: jest.fn(),
+    getProviderSpec: jest.fn(),
+  };
+});
 
 jest.mock("next/router", () => ({
   useRouter: () => ({
@@ -71,15 +68,13 @@ describe("when user has not verified with EnsProvider", () => {
   });
   it("should display a verification button", () => {
     const drawer = () => (
-      <Drawer isOpen={true} placement="right" size="sm" onClose={() => {}}>
-        <DrawerOverlay />
-        <GenericPlatform
-          platform={new Ens.EnsPlatform()}
-          platFormGroupSpec={Ens.ProviderConfig}
-          platformScoreSpec={EnsScoreSpec}
-          onClose={() => {}}
-        />
-      </Drawer>
+      <GenericPlatform
+        isOpen={true}
+        platform={new Ens.EnsPlatform()}
+        platFormGroupSpec={Ens.ProviderConfig}
+        platformScoreSpec={EnsScoreSpec}
+        onClose={() => {}}
+      />
     );
 
     renderWithContext(mockCeramicContext, drawer());
@@ -88,20 +83,16 @@ describe("when user has not verified with EnsProvider", () => {
   });
   it("should attempt to fetch a verifiable credential when the button is clicked", async () => {
     const drawer = () => (
-      <Drawer isOpen={true} placement="right" size="sm" onClose={() => {}}>
-        <DrawerOverlay />
-        <GenericPlatform
-          platform={new Ens.EnsPlatform()}
-          platFormGroupSpec={Ens.ProviderConfig}
-          platformScoreSpec={EnsScoreSpec}
-          onClose={() => {}}
-        />
-      </Drawer>
+      <GenericPlatform
+        isOpen={true}
+        platform={new Ens.EnsPlatform()}
+        platFormGroupSpec={Ens.ProviderConfig}
+        platformScoreSpec={EnsScoreSpec}
+        onClose={() => {}}
+      />
     );
     renderWithContext(mockCeramicContext, drawer());
 
-    const firstSwitch = screen.queryByTestId("select-all");
-    fireEvent.click(firstSwitch as HTMLElement);
     const initialVerifyButton = screen.queryByTestId("button-verify-Ens");
 
     fireEvent.click(initialVerifyButton as HTMLElement);
@@ -113,21 +104,17 @@ describe("when user has not verified with EnsProvider", () => {
   it("should show success toast when credential is fetched", async () => {
     const drawer = () => (
       <ChakraProvider>
-        <Drawer isOpen={true} placement="right" size="sm" onClose={() => {}}>
-          <DrawerOverlay />
-          <GenericPlatform
-            platform={new Ens.EnsPlatform()}
-            platFormGroupSpec={Ens.ProviderConfig}
-            platformScoreSpec={EnsScoreSpec}
-            onClose={() => {}}
-          />
-        </Drawer>
+        <GenericPlatform
+          platform={new Ens.EnsPlatform()}
+          isOpen={true}
+          platFormGroupSpec={Ens.ProviderConfig}
+          platformScoreSpec={EnsScoreSpec}
+          onClose={() => {}}
+        />
       </ChakraProvider>
     );
     renderWithContext(mockCeramicContext, drawer());
 
-    const firstSwitch = screen.queryByTestId("select-all");
-    fireEvent.click(firstSwitch as HTMLElement);
     const initialVerifyButton = screen.queryByTestId("button-verify-Ens");
 
     fireEvent.click(initialVerifyButton as HTMLElement);
@@ -140,23 +127,19 @@ describe("when user has not verified with EnsProvider", () => {
   it("should prompt user to refresh when session expired", async () => {
     const drawer = () => (
       <ChakraProvider>
-        <Drawer isOpen={true} placement="right" size="sm" onClose={() => {}}>
-          <DrawerOverlay />
-          <GenericPlatform
-            platform={new Ens.EnsPlatform()}
-            platFormGroupSpec={Ens.ProviderConfig}
-            platformScoreSpec={EnsScoreSpec}
-            onClose={() => {}}
-          />
-        </Drawer>
+        <GenericPlatform
+          isOpen={true}
+          platform={new Ens.EnsPlatform()}
+          platFormGroupSpec={Ens.ProviderConfig}
+          platformScoreSpec={EnsScoreSpec}
+          onClose={() => {}}
+        />
       </ChakraProvider>
     );
     renderWithContext(mockCeramicContext, drawer(), {
       checkSessionIsValid: () => false,
     });
 
-    const firstSwitch = screen.queryByTestId("select-all");
-    fireEvent.click(firstSwitch as HTMLElement);
     const initialVerifyButton = screen.queryByTestId("button-verify-Ens");
 
     fireEvent.click(initialVerifyButton as HTMLElement);
@@ -179,20 +162,18 @@ describe("when user has previously verified with EnsProvider", () => {
     const extraProvider = "FakeExtraProviderRequiredForCanSubmitLogic" as PROVIDER_ID;
     const drawer = () => (
       <ChakraProvider>
-        <Drawer isOpen={true} placement="right" size="sm" onClose={() => {}}>
-          <DrawerOverlay />
-          <GenericPlatform
-            platform={new Ens.EnsPlatform()}
-            platFormGroupSpec={[
-              {
-                ...Ens.ProviderConfig[0],
-                providers: [...Ens.ProviderConfig[0].providers, { title: "Extra", name: extraProvider }],
-              },
-            ]}
-            platformScoreSpec={EnsScoreSpec}
-            onClose={() => {}}
-          />
-        </Drawer>
+        <GenericPlatform
+          isOpen={true}
+          platform={new Ens.EnsPlatform()}
+          platFormGroupSpec={[
+            {
+              ...Ens.ProviderConfig[0],
+              providers: [...Ens.ProviderConfig[0].providers, { title: "Extra", name: extraProvider }],
+            },
+          ]}
+          platformScoreSpec={EnsScoreSpec}
+          onClose={() => {}}
+        />
       </ChakraProvider>
     );
 
@@ -205,9 +186,6 @@ describe("when user has previously verified with EnsProvider", () => {
       },
       drawer()
     );
-
-    const firstSwitch = screen.queryByTestId("select-all");
-    fireEvent.click(firstSwitch as HTMLElement);
     const initialVerifyButton = screen.queryByTestId("button-verify-Ens");
     fireEvent.click(initialVerifyButton as HTMLElement);
 
@@ -220,6 +198,52 @@ describe("when user has previously verified with EnsProvider", () => {
       expect(fetchVerifiableCredential).toHaveBeenCalled();
     });
   });
+  it("should remove expired stamps if the no longer qualify", async () => {
+    (fetchVerifiableCredential as jest.Mock).mockResolvedValue({
+      credentials: [UN_SUCCESSFUL_ENS_RESULT],
+    });
+    const drawer = () => (
+      <ChakraProvider>
+        <GenericPlatform
+          isOpen={true}
+          platform={new Ens.EnsPlatform()}
+          platFormGroupSpec={[
+            {
+              ...Ens.ProviderConfig[0],
+              providers: [...Ens.ProviderConfig[0].providers],
+            },
+          ]}
+          platformScoreSpec={EnsScoreSpec}
+          onClose={() => {}}
+        />
+      </ChakraProvider>
+    );
+
+    const handlePatchStampsMock = jest.fn();
+    renderWithContext(
+      {
+        ...mockCeramicContext,
+        verifiedProviderIds: ["Ens"],
+        expiredProviders: ["Ens"],
+        handlePatchStamps: handlePatchStampsMock,
+      },
+      drawer()
+    );
+    const initialVerifyButton = screen.queryByTestId("button-verify-Ens");
+    fireEvent.click(initialVerifyButton as HTMLElement);
+
+    // Wait to see the done toast
+    await waitFor(() => {
+      // extraProvider should be empty but ens should be there to delete expired stamp you no longer qualify for
+      expect(handlePatchStampsMock).toHaveBeenCalledWith([
+        {
+          provider: "Ens",
+        },
+      ]);
+
+      expect(fetchVerifiableCredential).toHaveBeenCalled();
+    });
+  });
 });
 
 describe("Mulitple EVM plaftorms", () => {
@@ -228,20 +252,16 @@ describe("Mulitple EVM plaftorms", () => {
       credentials: [UN_SUCCESSFUL_ENS_RESULT],
     });
     const drawer = () => (
-      <Drawer isOpen={true} placement="right" size="sm" onClose={() => {}}>
-        <DrawerOverlay />
-        <GenericPlatform
-          platform={new Ens.EnsPlatform()}
-          platFormGroupSpec={Ens.ProviderConfig}
-          platformScoreSpec={EnsScoreSpec}
-          onClose={() => {}}
-        />
-      </Drawer>
+      <GenericPlatform
+        isOpen={true}
+        platform={new Ens.EnsPlatform()}
+        platFormGroupSpec={Ens.ProviderConfig}
+        platformScoreSpec={EnsScoreSpec}
+        onClose={() => {}}
+      />
     );
     renderWithContext(mockCeramicContext, drawer());
 
-    const firstSwitch = screen.queryByTestId("select-all");
-    fireEvent.click(firstSwitch as HTMLElement);
     const initialVerifyButton = screen.queryByTestId("button-verify-Ens");
 
     fireEvent.click(initialVerifyButton as HTMLElement);
@@ -255,21 +275,16 @@ describe("Mulitple EVM plaftorms", () => {
 it("should indicate that there was an error issuing the credential", async () => {
   const drawer = () => (
     <ChakraProvider>
-      <Drawer isOpen={true} placement="right" size="sm" onClose={() => {}}>
-        <DrawerOverlay />
-        <GenericPlatform
-          platform={new Ens.EnsPlatform()}
-          platFormGroupSpec={Ens.ProviderConfig}
-          platformScoreSpec={EnsScoreSpec}
-          onClose={() => {}}
-        />
-      </Drawer>
+      <GenericPlatform
+        isOpen={true}
+        platform={new Ens.EnsPlatform()}
+        platFormGroupSpec={Ens.ProviderConfig}
+        platformScoreSpec={EnsScoreSpec}
+        onClose={() => {}}
+      />
     </ChakraProvider>
   );
   renderWithContext({ ...mockCeramicContext, handlePatchStamps: jest.fn().mockRejectedValue(500) }, drawer());
-
-  const firstSwitch = screen.queryByTestId("select-all");
-  fireEvent.click(firstSwitch as HTMLElement);
   const initialVerifyButton = screen.queryByTestId("button-verify-Ens");
 
   fireEvent.click(initialVerifyButton as HTMLElement);

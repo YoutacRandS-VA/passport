@@ -1,108 +1,145 @@
-import React, { useContext, useMemo, useState } from "react";
+import React, { Fragment, Ref, useContext, useMemo, useState } from "react";
 import { PlatformBanner, PlatformSpec } from "@gitcoin/passport-platforms";
 import { GenericBanner } from "./GenericBanner";
 import { JsonOutputModal } from "./JsonOutputModal";
 import { CeramicContext } from "../context/ceramicContext";
 
-import { ClockIcon, StarIcon } from "@heroicons/react/20/solid";
 import { ScorerContext } from "../context/scorerContext";
+import { Popover, Transition } from "@headlessui/react";
+import { RemoveStampModal } from "./RemoveStampModal";
+import { ProgressBar } from "./ProgressBar";
+import { getDaysToExpiration } from "../utils/duration";
+import { customStampProviders, getStampProviderIds } from "../config/providers";
+import { PLATFORM_ID } from "@gitcoin/passport-types";
+import { useCustomization } from "../hooks/useCustomization";
 
-const PlatformJsonButton = ({ platformPassportData }: { platformPassportData: any }) => {
-  const [isOpen, setIsOpen] = useState(false);
+// --- Helpers
+import { intersect } from "../utils/helpers";
+
+const PlatformJsonButton = ({
+  platformPassportData,
+  platform,
+  onClose,
+}: {
+  platformPassportData: any;
+  platform: PlatformSpec;
+  onClose: () => void;
+}) => {
+  const { handleDeleteStamps } = useContext(CeramicContext);
+  const customization = useCustomization();
+  const [stampDetailsModal, setStampDetailsModal] = useState(false);
+  const [removeStampModal, setRemoveStampModal] = useState(false);
+  const [referenceElement, setReferenceElement] = useState(null);
+
+  const providerIds = getStampProviderIds(platform.platform, customStampProviders(customization));
+
+  const onRemoveStamps = async () => {
+    await handleDeleteStamps(providerIds);
+    onClose();
+  };
 
   return (
     <>
-      <button
-        data-testid="button-passport-json-mobile"
-        className="ml-auto h-8 w-8 rounded-md border border-foreground-4 bg-background text-xs text-color-2"
-        onClick={() => setIsOpen(true)}
-        title="View Stamp JSON"
-      >
-        {`</>`}
-      </button>
+      <Popover className="relative">
+        <>
+          <Popover.Button ref={setReferenceElement as unknown as Ref<HTMLButtonElement>} className="ml-auto p-2">
+            <svg width="4" height="16" viewBox="0 0 4 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <ellipse cx="2" cy="2" rx="2" ry="2" fill="white" />
+              <ellipse cx="2" cy="8" rx="2" ry="2" fill="white" />
+              <ellipse cx="2" cy="13.7998" rx="2" ry="2" fill="white" />
+            </svg>
+          </Popover.Button>
+          <Transition
+            as={Fragment}
+            enter="transition ease-out duration-100"
+            enterFrom="opacity-0 translate-y-1"
+            enterTo="opacity-100 translate-y-0"
+            leave="transition ease-in duration-150"
+            leaveFrom="opacity-100 translate-y-0"
+            leaveTo="opacity-0 translate-y-1"
+          >
+            <Popover.Panel className="absolute w-48 right-1 bg-background flex flex-col justify-start text-left p-4 rounded">
+              <button onClick={() => setStampDetailsModal(true)} className="w-full text-left">
+                Stamp Details
+              </button>
+              <button className="w-full text-left text-color-7" onClick={() => setRemoveStampModal(true)}>
+                Remove Stamp
+              </button>
+            </Popover.Panel>
+          </Transition>
+        </>
+      </Popover>
       <JsonOutputModal
-        isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
+        isOpen={stampDetailsModal}
+        onClose={() => setStampDetailsModal(false)}
         title={"Platform JSON"}
         subheading={"You can find the Passport JSON data for this platform below"}
         jsonOutput={platformPassportData}
+      />
+      <RemoveStampModal
+        isOpen={removeStampModal}
+        onClose={onClose}
+        title={`Remove ${platform.name} Stamp`}
+        body={"This stamp will be removed from your Passport. You can still re-verify your stamp in the future."}
+        stampsToBeDeleted={providerIds}
+        handleDeleteStamps={onRemoveStamps}
+        platformId={platform.name as PLATFORM_ID}
       />
     </>
   );
 };
 
-const isoToDateString = (isoDate: string) => {
-  const date = new Date(isoDate);
-  return `${date.getMonth() + 1}.${date.getDate()}.${date.getFullYear()}`;
+const ExpirationIndicator = ({ expirationDate }: { expirationDate: Date | string }) => {
+  const daysUntilExpiration = getDaysToExpiration({ expirationDate });
+
+  const statusClass =
+    daysUntilExpiration > 45 ? "text-color-8" : daysUntilExpiration > 10 ? "text-color-9" : "text-color-10";
+  if (daysUntilExpiration < 0) {
+    //     bg-gradient-to-b from-background to-background-5/30
+    // hover:bg-opacity-100 hover:from-transparent hover:shadow-even-md hover:border-background-5 hover:to-background-5/60 hover:shadow-background-5"
+    return (
+      <div
+        className="pl-4 flex items-center text-color-7 border-t-0 rounded-t-none rounded-b-lg py-2
+        border border-background-5 bg-gradient-to-b from-background to-background-5/30"
+      >
+        Stamp expired
+      </div>
+    );
+  } else {
+    return (
+      <div className="pl-4 flex items-center text-color-6 bg-gradient-to-b from-background via-background to-[#082F2A] border border-t-0 rounded-t-none rounded-b-lg border-foreground-5 py-2">
+        <span className={`text-3xl pr-2 ${statusClass}`}>{daysUntilExpiration}</span>{" "}
+        {daysUntilExpiration === 1 ? "day" : "days"} until stamps expire
+      </div>
+    );
+  }
 };
 
-const ProgressBar = ({ pointsGained, pointsAvailable }: { pointsGained: number; pointsAvailable: number }) => {
-  const percentGained = (pointsGained / (pointsGained + pointsAvailable)) * 100 || 0;
-
-  // Offset for the beginning of the progress bar
-  const startOffset = 2;
-  const progressBarOffset = percentGained + startOffset;
-
-  return (
-    <svg viewBox="0 8 104 4">
-      {/* Rounded left edge */}
-      <path d="M2,10 L2,10" strokeLinecap="round" strokeWidth={4} stroke="rgb(var(--color-foreground-2))" />
-
-      {/* Rounded right edge */}
-      <path d="M102,10 L102,10" strokeLinecap="round" strokeWidth={4} stroke="rgb(var(--color-foreground-4))" />
-
-      {/* Background w/ "available" color */}
-      <path d="M2,10 L102,10" strokeLinecap="butt" strokeWidth={4} stroke="rgb(var(--color-foreground-4))" />
-
-      {/* Black progress bar, sticks out a little further than the main progress bar to show a black line */}
-      <path
-        d={`M2,10 L102,10`}
-        strokeLinecap="butt"
-        strokeWidth={4}
-        stroke="rgb(var(--color-background))"
-        strokeDasharray="102"
-        strokeDashoffset={104 - progressBarOffset - 0.75}
-        className="transition-[stroke-dashoffset] delay-100 duration-1000 ease-in-out"
-      />
-
-      {/* Main progress bar */}
-      <path
-        d={`M2,10 L102,10`}
-        strokeLinecap={percentGained < 100 ? "butt" : "round"}
-        strokeWidth={4}
-        stroke="rgb(var(--color-foreground-2))"
-        strokeDasharray="102"
-        strokeDashoffset={104 - progressBarOffset}
-        className="transition-[stroke-dashoffset] delay-100 duration-1000 ease-in-out"
-      />
-    </svg>
-  );
-};
+export const customSideBarGradient = "bg-gradient-to-b from-background via-background to-[#082F2A]";
 
 export const PlatformDetails = ({
   currentPlatform,
   bannerConfig,
   verifiedProviders,
+  onClose,
 }: {
   currentPlatform: PlatformSpec;
   bannerConfig?: PlatformBanner;
   verifiedProviders?: string[];
+  onClose: () => void;
 }) => {
   const { scoredPlatforms } = useContext(ScorerContext);
-  const { passport } = useContext(CeramicContext);
+  const { passport, platformExpirationDates, expiredProviders } = useContext(CeramicContext);
 
   const currentPlatformScoreSpec = scoredPlatforms.find((platform) => platform.name === currentPlatform.name);
 
   const platformPassportData = useMemo(
     () =>
-      verifiedProviders && passport && passport.stamps.filter((stamp) => verifiedProviders.includes(stamp.provider)),
+      verifiedProviders && passport && passport.stamps.filter((stamp) => verifiedProviders?.includes(stamp.provider)),
     [verifiedProviders, passport]
   );
 
   const hasStamps = platformPassportData && !!platformPassportData.length;
-
-  const earnedDate = hasStamps ? isoToDateString(platformPassportData[0].credential.issuanceDate) : "mm.dd.yyyy";
-  const expiresDate = hasStamps ? isoToDateString(platformPassportData[0].credential.expirationDate) : "mm.dd.yyyy";
 
   const earnedPoints = currentPlatformScoreSpec?.earnedPoints || 0;
   const possiblePoints = currentPlatformScoreSpec?.possiblePoints || 0;
@@ -110,12 +147,75 @@ export const PlatformDetails = ({
   const pointsGained = +earnedPoints.toFixed(2);
   const pointsAvailable = +Math.max(possiblePoints - earnedPoints, 0).toFixed(2);
 
+  verifiedProviders = verifiedProviders || [];
+  const hasExpiredProviders = useMemo(() => {
+    return intersect(new Set(expiredProviders), new Set(verifiedProviders)).size > 0;
+  }, [verifiedProviders, expiredProviders]);
+
+  const pointsBox = useMemo(() => {
+    if (!hasStamps) {
+      return null;
+    }
+
+    return hasExpiredProviders ? (
+      <>
+        <div className="mt-4 border-background-5 border rounded-t-lg px-4 py-2">
+          <div className="flex justify-between">
+            <p className="text-color-10">points gained</p>
+            <p className="text-color-7">points left</p>
+          </div>
+          <div className="flex justify-between text-5xl">
+            <p className="text-color-10">{pointsGained}</p>
+            <p className="text-color-7">{pointsAvailable}</p>
+          </div>
+          <ProgressBar
+            pointsGained={pointsGained}
+            pointsAvailable={pointsAvailable}
+            gainedBarColor="rgb(var(--color-text-7))"
+            availableBarColor="rgb(var(--color-text-10))"
+          />
+        </div>
+        <ExpirationIndicator expirationDate={platformExpirationDates[currentPlatform.platform as PLATFORM_ID] || ""} />
+      </>
+    ) : (
+      <>
+        <div className="mt-4 border-foreground-5 border rounded-t-lg px-4 py-2 bg-gradient-to-b from-background via-background to-[#082F2A]">
+          <div className="flex justify-between">
+            <p className="text-color-6">points gained</p>
+            <p className="text-color-2">points left</p>
+          </div>
+          <div className="flex justify-between text-5xl">
+            <p className="text-color-6">{pointsGained}</p>
+            <p className="text-color-2">{pointsAvailable}</p>
+          </div>
+          <ProgressBar pointsGained={pointsGained} pointsAvailable={pointsAvailable} />
+        </div>
+        <ExpirationIndicator expirationDate={platformExpirationDates[currentPlatform.platform as PLATFORM_ID] || ""} />
+      </>
+    );
+  }, [
+    hasStamps,
+    hasExpiredProviders,
+    pointsGained,
+    pointsAvailable,
+    platformExpirationDates,
+    currentPlatform.platform,
+  ]);
+
   return (
     <div className="w-full text-color-1">
-      <div className="flex w-full items-center">
-        <img alt="Platform Image" className="h-10 w-10" src={currentPlatform?.icon} />
-        <h2 className="ml-4 text-2xl">{currentPlatform?.name}</h2>
-        {!!verifiedProviders?.length && <PlatformJsonButton platformPassportData={platformPassportData} />}
+      <div className="flex w-full items-center justify-between">
+        <div className="flex">
+          <img alt="Platform Image" className="h-10 w-10" src={currentPlatform?.icon} />
+          <h2 className="ml-4 text-2xl">{currentPlatform?.name}</h2>
+        </div>
+        {!!verifiedProviders?.length && currentPlatformScoreSpec && (
+          <PlatformJsonButton
+            platform={currentPlatformScoreSpec}
+            platformPassportData={platformPassportData}
+            onClose={onClose}
+          />
+        )}
       </div>
       {currentPlatform?.website ? (
         <a
@@ -130,30 +230,7 @@ export const PlatformDetails = ({
         <p className="mt-8 text-base md:w-8/12">{currentPlatform?.description}</p>
       )}
       {bannerConfig && <GenericBanner banner={bannerConfig} />}
-      <hr className="mt-4 border-foreground-3" />
-      <div className="my-4 grid grid-cols-[1fr_2px_1fr] gap-y-4 text-center">
-        <div className={`flex flex-col items-center ${hasStamps ? "text-color-2" : "text-color-5"}`}>
-          <StarIcon width="40" />
-          <span className="font-bold">Earned</span>
-          <span className="">{earnedDate}</span>
-        </div>
-        <div className={`col-start-3 flex flex-col items-center ${hasStamps ? "text-color-2" : "text-color-5"}`}>
-          <ClockIcon width="40" />
-          <span className="font-bold">Expires</span>
-          <span className="">{expiresDate}</span>
-        </div>
-        <hr className="col-span-full border-foreground-3" />
-        <div className="flex flex-col items-center text-foreground-2">
-          <span className="text-4xl">{pointsGained}</span>
-          <span className="">Points Gained</span>
-        </div>
-        <div className="border-r border-foreground-3" />
-        <div className="flex flex-col items-center text-color-2">
-          <span className="text-4xl">{pointsAvailable}</span>
-          <span className="">Available Points</span>
-        </div>
-      </div>
-      <ProgressBar pointsGained={pointsGained} pointsAvailable={pointsAvailable} />
+      {pointsBox}
     </div>
   );
 };

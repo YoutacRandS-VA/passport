@@ -3,11 +3,12 @@ import { EasPayload, VerifiableCredential, Passport } from "@gitcoin/passport-ty
 import { ethers, EthersError, isError } from "ethers";
 import { useCallback, useContext, useState } from "react";
 import { CeramicContext } from "../context/ceramicContext";
-import { OnChainContext } from "../context/onChainContext";
 import { useWalletStore } from "../context/walletStore";
 import { DoneToastContent } from "../components/DoneToastContent";
 import { OnChainStatus } from "../utils/onChainStatus";
 import { Chain } from "../utils/chains";
+import { useOnChainData } from "./useOnChainData";
+import { useSwitchNetwork } from "@web3modal/ethers/react";
 
 const fail = "../assets/verification-failed-bright.svg";
 const success = "../../assets/check-icon2.svg";
@@ -26,11 +27,11 @@ export const useSyncToChainButton = ({
   const address = useWalletStore((state) => state.address);
   const provider = useWalletStore((state) => state.provider);
   const connectedChain = useWalletStore((state) => state.chain);
-  const setChain = useWalletStore((state) => state.setChain);
 
   const { passport } = useContext(CeramicContext);
-  const { readOnChainData } = useContext(OnChainContext);
+  const { refresh } = useOnChainData();
   const [syncingToChain, setSyncingToChain] = useState(false);
+  const { switchNetwork } = useSwitchNetwork();
 
   const loadVerifierContract = useCallback(
     async (provider: ethers.Eip1193Provider) => {
@@ -100,7 +101,7 @@ export const useSyncToChainButton = ({
             if (data.invalidCredentials.length > 0) {
               // This can only happen when trying to bring the entire passport onchain
               // This cannot happen when we only bring the score onchain
-              // TODO: maybe we should prompt the user if he wants to continue? Maybe he wants to refresh his attenstations first?
+              // TODO: maybe we should prompt the user if he wants to continue? Maybe he wants to refresh his attestations first?
               console.log("not syncing invalid credentials (invalid credentials): ", data.invalidCredentials);
             }
 
@@ -125,7 +126,8 @@ export const useSyncToChainButton = ({
               });
               await transaction.wait();
 
-              await readOnChainData(chain.id);
+              refresh(chain.id);
+
               const successSubmit = (
                 <p>
                   Passport successfully synced to chain.{" "}
@@ -229,19 +231,23 @@ export const useSyncToChainButton = ({
         }
       }
     },
-    [address, chain?.attestationProvider, chain?.id, loadVerifierContract, readOnChainData, toast]
+    [address, chain?.attestationProvider, chain?.id, loadVerifierContract, refresh, toast]
   );
 
   const onInitiateSyncToChain = useCallback(
     async (provider: ethers.Eip1193Provider | undefined, passport: Passport | undefined | false) => {
       if (connectedChain && chain && connectedChain !== chain.id) {
-        const setChainResponse = await setChain(chain.id);
-        setChainResponse && (await onSyncToChain(provider, passport));
+        let switchedChain = false;
+        try {
+          await switchNetwork(parseInt(chain.id, 16));
+          switchedChain = true;
+        } catch {}
+        switchedChain && (await onSyncToChain(provider, passport));
         return;
       }
       await onSyncToChain(provider, passport);
     },
-    [chain?.id, connectedChain, onSyncToChain, setChain]
+    [chain?.id, connectedChain, onSyncToChain, switchNetwork]
   );
 
   const isActive = chain?.attestationProvider?.status === "enabled";
